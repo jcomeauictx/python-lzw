@@ -68,6 +68,7 @@ DEFAULT_MAX_BITS = 12
 
 # compatibility code not provided by `six` package (?)
 try:
+    (0).bit_length()
     bitlength = lambda number: (number).bit_length()
 except AttributeError:
     bitlength = lambda number: len(bin(number)) - 2
