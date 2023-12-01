@@ -53,6 +53,7 @@ True
 """
 
 
+import sys
 import struct
 import itertools
 import six
@@ -65,7 +66,11 @@ END_OF_INFO_CODE = 257
 DEFAULT_MIN_BITS = 9
 DEFAULT_MAX_BITS = 12
 
-
+# compatibility code not provided by `six` package (?)
+try:
+    bitlength = lambda number: (number).bit_length()
+except AttributeError:
+    bitlength = lambda number: len(bin(number)) - 2
 
 
 def compress(plaintext_bytes):
@@ -230,8 +235,9 @@ class BitPacker(object):
             codesize = codesize + 1
 
             if pt == END_OF_INFO_CODE:
-               while len(tailbits) % 8:
-                  tailbits.append(0)
+                logging.debug('BitPacker.pack: END_OF_INFO_CODE found')
+                while len(tailbits) % 8:
+                    tailbits.append(0)
                   
             if pt in [ CLEAR_CODE, END_OF_INFO_CODE ]:
                 nextwidth = minwidth
@@ -263,7 +269,8 @@ class BitUnpacker(object):
     about code size changes and control codes.
     """
 
-    def __init__(self, initial_code_size, max_code_size=1 << 12 - 1):
+    def __init__(self, initial_code_size,
+                 max_code_size=1 << DEFAULT_MAX_BITS - 1):
         """
         initial_code_size is the starting size of the codebook
         associated with the to-be-unpacked stream.
@@ -271,8 +278,8 @@ class BitUnpacker(object):
         self._initial_code_size = initial_code_size
         # could use int.bit_length if this were python3 only
         # bin(258): '0b100000010'
-        self.minwidth = len(bin(initial_code_size)) - 2 
-        self.maxwidth = len(bin(max_code_size)) - 2
+        self.minwidth = bitlength(initial_code_size)
+        self.maxwidth = bitlength(max_code_size)
         logging.debug('bit width range: %d-%d', self.minwidth, self.maxwidth)
 
     def unpack(self, bytesource):
@@ -323,13 +330,13 @@ class BitUnpacker(object):
                 if codepoint in [ CLEAR_CODE, END_OF_INFO_CODE ]:
                     codesize = self._initial_code_size
                     pointwidth = self.minwidth
-                elif pointwidth < self.maxwidth:
-                    logging.debug('raising pointwidth to %d', pointwidth + 1)
+                elif self.maxwidth >= bitlength(codesize + 2) > pointwidth:
+                    logging.debug('raising pointwidth to %d at codesize %d',
+                                  pointwidth + 1, codesize)
                     pointwidth = pointwidth + 1
-                else:
-                    logging.debug('not raising pointwidth > %d', self.maxwidth)
 
                 if codepoint == END_OF_INFO_CODE:
+                    logging.debug('BitUnpacker.unpack: END_OF_INFO_CODE found')
                     ignore = (8 - offset) % 8
 
 
@@ -418,7 +425,8 @@ class Decoder(object):
             logging.debug('CLEAR_CODE received, clearing code table')
             self._clear_codes()
         elif codepoint == END_OF_INFO_CODE:
-            raise ValueError("End of information code not supported directly by this Decoder")
+            logging.fatal("End of information code not supported directly by this Decoder")
+            sys.exit(1)
         else:
             if codepoint in self._codepoints:
                 logging.debug('known codepoint 0x%x (%d) found', codepoint, codepoint)
@@ -635,6 +643,7 @@ class PagingDecoder(object):
                 if cp != END_OF_INFO_CODE:
                     yield cp
                 else:
+                    logging.debug('PagingDecoder.next_page: processing END_OF_INFO_CODE')
                     self._remains = codepoints
                     break
 
