@@ -263,13 +263,17 @@ class BitUnpacker(object):
     about code size changes and control codes.
     """
 
-    def __init__(self, initial_code_size):
-       """
-       initial_code_size is the starting size of the codebook
-       associated with the to-be-unpacked stream.
-       """
-       self._initial_code_size = initial_code_size
-
+    def __init__(self, initial_code_size, max_code_size=1 << 12 - 1):
+        """
+        initial_code_size is the starting size of the codebook
+        associated with the to-be-unpacked stream.
+        """
+        self._initial_code_size = initial_code_size
+        # could use int.bit_length if this were python3 only
+        # bin(258): '0b100000010'
+        self.minwidth = len(bin(initial_code_size)) - 2 
+        self.maxwidth = len(bin(max_code_size)) - 2
+        logging.debug('bit width range: %d-%d', self.minwidth, self.maxwidth)
 
     def unpack(self, bytesource):
         """
@@ -297,11 +301,7 @@ class BitUnpacker(object):
         ignore = 0
         
         codesize = self._initial_code_size
-        minwidth = 8
-        while (1 << minwidth) < codesize:
-            minwidth = minwidth + 1
-
-        pointwidth = minwidth
+        pointwidth = self.minwidth
 
         for nextbit in bytestobits(bytesource):
 
@@ -322,12 +322,12 @@ class BitUnpacker(object):
 
                 if codepoint in [ CLEAR_CODE, END_OF_INFO_CODE ]:
                     codesize = self._initial_code_size
-                    pointwidth = minwidth
+                    pointwidth = self.minwidth
+                elif pointwidth < self.maxwidth:
+                    logging.debug('raising pointwidth to %d', pointwidth + 1)
+                    pointwidth = pointwidth + 1
                 else:
-                    # is this too late?
-                    while codesize >= (2 ** pointwidth):
-                        logging.debug('raising pointwidth to %d', pointwidth + 1)
-                        pointwidth = pointwidth + 1
+                    logging.debug('not raising pointwidth > %d', self.maxwidth)
 
                 if codepoint == END_OF_INFO_CODE:
                     ignore = (8 - offset) % 8
