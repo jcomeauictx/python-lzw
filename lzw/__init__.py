@@ -56,6 +56,8 @@ True
 import struct
 import itertools
 import six
+import logging
+logging.basicConfig(level=logging.DEBUG if __debug__ else logging.WARNING)
 
 CLEAR_CODE = 256
 END_OF_INFO_CODE = 257
@@ -324,6 +326,7 @@ class BitUnpacker(object):
                 else:
                     # is this too late?
                     while codesize >= (2 ** pointwidth):
+                        logging.debug('raising pointwidth to %d', pointwidth + 1)
                         pointwidth = pointwidth + 1
 
                 if codepoint == END_OF_INFO_CODE:
@@ -412,17 +415,26 @@ class Decoder(object):
         ret = b""
 
         if codepoint == CLEAR_CODE:
+            logging.debug('CLEAR_CODE received, clearing code table')
             self._clear_codes()
         elif codepoint == END_OF_INFO_CODE:
             raise ValueError("End of information code not supported directly by this Decoder")
         else:
             if codepoint in self._codepoints:
+                logging.debug('known codepoint 0x%x (%d) found', codepoint, codepoint)
                 ret = self._codepoints[ codepoint ]
-                if None != self._prefix:
+                if self._prefix is not None:
+                    logging.debug('self._prefix: %d bytes', len(self._prefix))
                     self._codepoints[ len(self._codepoints) ] = self._prefix + six.int2byte(six.indexbytes(ret, 0))
 
             else:
-                ret = self._prefix + six.int2byte(six.indexbytes(self._prefix, 0))
+                logging.debug('unknown codepoint 0x%x (%d) found', codepoint, codepoint)
+                logging.debug('length of known codepoints: %d', len(self._codepoints))
+                try:
+                    ret = self._prefix + six.int2byte(six.indexbytes(self._prefix, 0))
+                except TypeError:
+                    logging.debug('self._prefix: %s, self: %s', self._prefix, self)
+                    raise
                 self._codepoints[ len(self._codepoints) ] = ret
 
             self._prefix = ret
