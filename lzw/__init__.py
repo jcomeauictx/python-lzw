@@ -439,6 +439,8 @@ class Decoder(object):
             else:
                 logging.debug('unknown codepoint 0x%x (%d) found', codepoint, codepoint)
                 logging.debug('length of known codepoints: %d', len(self._codepoints))
+                if codepoint > len(self._codepoints) + 1:
+                    raise ValueError('Uncorrectable codepoint value found')
                 try:
                     ret = self._prefix + six.int2byte(six.indexbytes(self._prefix, 0))
                 except TypeError:

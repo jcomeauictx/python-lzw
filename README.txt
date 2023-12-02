@@ -1,3 +1,10 @@
+# FORGET THIS
+I started trying to get this code working so I could verify my own lzw
+decoder. But it's a mess, and fixing one part breaks another part. I'm
+abandoning it. I don't think it's salvageable. See my `lzw` project instead.
+
+# original README
+
 This is the README file for lzw, small, low level, pure python module
 for simple, stream-friendly data compression, built around iterators.
 Please see the accompanying LICENSE.txt file for license terms.
